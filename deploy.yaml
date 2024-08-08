@@ -1,0 +1,59 @@
+- hosts: myhosts
+  become: yes
+  vars:
+    deployment_path: /opt
+    app_user: azureuser
+    server_name: "server ip"
+    app_port: 8080
+    app_binary_src: /path/to/go/codebase
+
+  tasks:
+    - name: Ensure deployment directory exists
+      file:
+        path: "{{ deployment_path }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0755'
+
+    - name: Copy Go binary to VM
+      copy:
+        src: "{{ app_binary_src }}"
+        dest: "{{ deployment_path }}"
+        mode: '0755'
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+
+    - name: Set up Systemd service for Go app
+      template:
+        src: webserver/templates/myapp.service.j2
+        dest: /etc/systemd/system/myapp.service
+      notify:
+        - restart myapp
+
+    - name: Configure Nginx
+      template:
+        src: webserver/templates/nginx.conf.j2
+        dest: /etc/nginx/sites-available/default
+      notify:
+        - reload nginx
+
+    - name: enable nginx
+      file:
+        src: /etc/nginx/sites-available/default
+        dest: /etc/nginx/sites-enabled/default
+        state: link
+      notify:
+        - reload nginx
+
+  handlers:
+    - name: restart myapp
+      systemd:
+        name: myapp
+        state: restarted
+        enabled: yes
+
+    - name: reload nginx
+      systemd:
+        name: nginx
+        state: reloaded

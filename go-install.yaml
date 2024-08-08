@@ -1,0 +1,55 @@
+- name: install go on vm
+  hosts: myhosts
+  become: yes
+  tasks:
+    - name: update apt repository
+      apt:
+        update_cache: yes 
+
+    - name: install dependencies
+      apt:
+        name: curl
+        state: present
+    
+    - name: download go binary
+      get_url:
+        url: "https://golang.org/dl/go1.22.5.linux-amd64.tar.gz"
+        dest: /tmp/go1.22.5.linux-amd64.tar.gz
+
+    - name: extract go
+      unarchive:
+        src: /tmp/go1.22.5.linux-amd64.tar.gz
+        dest: /usr/local
+        remote_src: yes
+
+    - name: remove tarball
+      file:
+        path: /tmp/go1.22.5.linux-amd64.tar.gz
+        state: absent
+
+    - name: go environment
+      copy: 
+        content: |
+          export PATH=$PATH:/usr/local/go/bin
+          export GOPATH=$HOME/go
+          export PATH=$PATH:$GOPATH/bin
+        dest: /etc/profile.d/go.sh
+        mode: 0644
+
+    - name: Ensure Go environment variables in user profile
+      lineinfile:
+        path: ~/.bashrc
+        line: 'source /etc/profile.d/go.sh'
+        create: yes
+        state: present
+
+    - name: Source Go environment variables for current session
+      shell: |
+        source /etc/profile.d/go.sh && go version
+      args:
+        executable: /bin/bash
+      register: go_version_output
+
+    - name: Print Go version
+      debug:
+        var: go_version_output.stdout
